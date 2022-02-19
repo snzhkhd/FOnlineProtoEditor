@@ -6,6 +6,8 @@
 #include <sstream>
 #include <vector>
 #include <direct.h>
+#include <codecvt>
+#include <locale>
 #include "FileManager.h"
 
 

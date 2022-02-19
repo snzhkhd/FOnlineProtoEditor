@@ -1,8 +1,10 @@
 #pragma once
-
+#include <msclr/marshal_cppstd.h>
 using namespace std;
 
 #define INIFILE ("Config.cfg");
+
+
 
 void Log(string str);
 
@@ -41,12 +43,18 @@ public:
 
 	string current_dir;
 
+//////////////////////////////// CONFIG
 	string server_path;
+	// 0 = engl, 1 = russ
+	int Lang = 0;
 
 	// config file 
 	bool Init();
 
-	
+	bool SaveConfig();
+//////////////////////////////// !CONFIG
+	int MaxBarValue = 0;
+	int progress = 0;
 
 	// !config file
 
@@ -57,12 +65,28 @@ public:
 	bool SaveFile(string name, vector<Proto> pro);
 
 
+	void SetFileSize(string name);
+
 	string GetValue(string Param);
 	size_t GetValueIndex(string Param);
 	bool SaveValue(string Param, string NewValue);
 
-	string LoadProtoName(int pid);
 
+	// protos func
+	string LoadProtoName(int pid);
+	string GetProtoType(int pid, Proto p);
+	string GetProtoType(Proto p);
+
+	int GetProtoTypeIndex(Proto p);
+
+	string GetStringType(int type);
+
+	const char* ToAnsi(System::String^ str);
+	string utf8_to_string(const char *utf8str);
+
+	System::String^ ToClrString(const char* str);
+	System::String^ ToClrString(string& str);
+	std::string UTF8to1251(std::string const& utf8);
 	string ClearFrom(string str, char symbl);
 
 	string GetValueForPid(int pid, string param);
@@ -72,6 +96,14 @@ public:
 	vector<string> StringSeperation(string Sourse, string delim);
 
 	void testLoadFile();
+
+
+/////////////////////////////
+
+	void AddToFavour();
+	void DeleteFromFavour();
+
+////////////////////////////	
 
 	FileManager()
 	{

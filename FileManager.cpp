@@ -35,20 +35,32 @@ bool FileManager::Init()
 	file_path = filename.str();
 
 	ifstream CurrentFile(file_path);
-//	CurrentFile.open(filename.str());
 	if (CurrentFile.is_open() )
 	{
 		string str;
-		while (!CurrentFile.eof())
-		{	// считывать данные с файла
+	//	while (!CurrentFile.eof())
+	//	{	// считывать данные с файла
 
 			getline(CurrentFile, str);
 			vector<string> tmp;
+			// path=
 			tmp = StringSeperation(str, "=");
 			if (tmp.size() > 1)
 				server_path = tmp[1];
+			tmp.clear();
+
+			// Lang=
+			getline(CurrentFile, str);
+			tmp = StringSeperation(str, "=");
+			if (tmp.size() > 1)
+			{
+				if (tmp[1] == "0")
+					Lang = 0;
+				else
+					Lang = 1;
+			}
 			CurrentFile.close();
-		}
+	//	}
 	}
 	else
 	{
@@ -57,6 +69,46 @@ bool FileManager::Init()
 		out.close();
 	}
 	return !server_path.empty();
+}
+
+bool FileManager::SaveConfig()
+{
+
+	stringstream filename;
+	current_dir = _getcwd(NULL, 0);
+	filename << current_dir << "\\" << INIFILE;
+
+	ifstream config(filename.str());
+	if (config.is_open())
+	{
+		
+		vector<string> Vec;
+		while (!config.eof())
+		{
+
+			string str;
+			stringstream file;
+
+			config >> str;
+			//getline(config, str);
+			if (str.substr(0, 4) == "Lang")
+			{
+				file << "Lang=" << Lang;
+				str = file.str();
+			}
+			Vec.push_back(str);
+		}
+		config.close();
+
+		ofstream ofs(filename.str());
+		for (vector<std::string>::const_iterator it = Vec.begin(); it != Vec.end(); ++it)
+			ofs << *it << endl;
+
+		ofs.close();
+		return true;
+	}
+
+	return false;
 }
 
 void FileManager::ClearData()
@@ -74,7 +126,7 @@ bool FileManager::OpenFile(string name)
 	if (CurrentFile.is_open())
 	{
 		file_path = name;
-
+		progress = 0;
 		string str;
 		while (!CurrentFile.eof())
 		{	// считывать данные с файла
@@ -87,6 +139,7 @@ bool FileManager::OpenFile(string name)
 				Names.push_back("\n");
 				Params.push_back("");
 				Values.push_back("");
+
 				continue;
 			}
 
@@ -96,6 +149,7 @@ bool FileManager::OpenFile(string name)
 				Names.push_back("");
 				Params.push_back(tmp[0] + "=");
 				Values.push_back(tmp[1]);
+				progress++;
 			}
 			else			// какие то параменры без значений
 			{
@@ -161,6 +215,21 @@ bool FileManager::SaveFile(string name, vector<Proto> pro)
 	out.close();
 	return false;
 }
+void FileManager::SetFileSize(string name)
+{
+	ifstream File;
+	File.open(name);
+	if (File.is_open())
+	{
+		file_path = name;
+		File.seekg(0, ios::end);
+		long size = File.tellg();
+		File.seekg(0, ios::beg);
+		MaxBarValue = size;
+		File.close();
+	}
+
+}
 // поиск значения по имени
 string FileManager::GetValue(string Param)
 {
@@ -188,17 +257,53 @@ bool FileManager::SaveValue(string Param, string NewValue)
 	return true;
 }
 
+string FileManager::utf8_to_string(const char *utf8str)
+{
+	// UTF-8 to wstring
+	wstring_convert<codecvt_utf8<wchar_t>> wconv;
+	wstring wstr = wconv.from_bytes(utf8str);
+	// wstring to string
+	vector<char> buf(wstr.size());
+	use_facet<ctype<wchar_t>>(locale(".1252")).narrow(wstr.data(), wstr.data() + wstr.size(), '?', buf.data());
+	return string(buf.data(), buf.size());
+}
+
+const char* FileManager::ToAnsi(System::String^ str)
+{
+	static char buf[4096];
+	pin_ptr<const wchar_t> wch = PtrToStringChars(str);
+	size_t origsize = wcslen(wch) + 1;
+	size_t convertedChars = 0;
+	wcstombs(buf, wch, sizeof(buf));
+	return buf;
+}
+
+System::String^ FileManager::ToClrString(const char* str)
+{
+	System::String^ res = System::String(str).ToString();
+	return res;
+}
+
+System::String^ FileManager::ToClrString(string& str)
+{
+	return ToClrString(str.c_str());
+}
+
+
 string FileManager::LoadProtoName(int pid)
 {
 	if (server_path.empty())
 	{
 		std::stringstream out;
 		out << pid;
-		return out.str();
+		return  out.str();
 	}
 
 	string m = server_path;
-	m += "\\text\\engl\\FOOBJ.MSG";
+	if(Lang == 0)
+		m += "\\text\\engl\\FOOBJ.MSG";
+	else
+		m += "\\text\\russ\\FOOBJ.MSG";
 	ifstream MsgFile(m);
 	string token;
 	//	CurrentFile.open(filename.str());
@@ -217,7 +322,7 @@ string FileManager::LoadProtoName(int pid)
 			if (str.substr(0, token.length()) == token)
 			{
 				str = ClearFrom(str.substr(token.length() + 3, str.length()), '}');
-				return str;	//	str.length() -	
+				return UTF8to1251(str.c_str());
 			}
 				
 
@@ -226,6 +331,82 @@ string FileManager::LoadProtoName(int pid)
 
 	return "unknown";
 }
+
+string FileManager::GetProtoType(int pid, Proto p)
+{
+	for (int i = 0; i < p.Params.size(); i++)
+	{
+		if (p.Params[i] == "Type=")
+			return GetStringType( atoi( p.Values[i].c_str()));
+	}
+
+	return string();
+}
+
+string FileManager::GetProtoType(Proto p)
+{
+	
+	return GetProtoType(p.pid, p);
+}
+
+int FileManager::GetProtoTypeIndex(Proto p)
+{
+	for (int i = 0; i < p.Params.size(); i++)
+	{
+		if (p.Params[i] == "Type=")
+			return atoi(p.Values[i].c_str());
+	}
+	return 0;
+}
+
+string FileManager::GetStringType(int type)
+{
+	vector<string> types = {"NONE", "ARMOR", "DRUG", "WEAPON", "AMMO", "MISC", "KEY", "CONTAINER" , "DOOR", "GRID", "GENERIC" , "WALL", "CAR"};
+
+	if (type > types.size())
+		type = 13;
+	if (type < 0)
+		type = 0;
+	return types[type];
+}
+
+
+// перекодирует все однобайтовые символы, а из двубайтовых только русские буквы
+std::string FileManager::UTF8to1251(std::string const& utf8)
+{
+	std::string s1251;
+	for (int i = 0; i < utf8.size(); ++i)
+	{
+		int b1 = (unsigned char)utf8[i];
+		if ((b1 >> 5) == 6)
+		{
+			int b2 = (unsigned char)utf8[i + 1];
+			if ((b1 == 208) && (b2 >= 144 && b2 <= 191))
+			{
+				s1251 += (char)(b2 + 48);
+			}
+			else if ((b1 == 209) && (b2 >= 128 && b2 <= 143))
+			{
+				s1251 += (char)(b2 + 112);
+			}
+			else if ((b1 == 208) && (b2 == 129))
+			{
+				s1251 += (char)(b2 + 39);
+			}
+			else if ((b1 == 209) && (b2 == 145))
+			{
+				s1251 += (char)(b2 + 39);
+			}
+			++i;
+		}
+		else if ((b1 >> 7) == 0)
+		{
+			s1251 += b1;
+		}
+	}
+	return s1251;
+}
+
 
 string FileManager::ClearFrom(string str, char symbl)
 {
