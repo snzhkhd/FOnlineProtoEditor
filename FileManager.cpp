@@ -27,6 +27,7 @@ void FileManager::testLoadFile()
 
 bool FileManager::Init()
 {
+	LoadFavourites();
 
 	stringstream filename;
 	current_dir =  _getcwd(NULL, 0);
@@ -38,9 +39,6 @@ bool FileManager::Init()
 	if (CurrentFile.is_open() )
 	{
 		string str;
-	//	while (!CurrentFile.eof())
-	//	{	// считывать данные с файла
-
 			getline(CurrentFile, str);
 			vector<string> tmp;
 			// path=
@@ -60,7 +58,6 @@ bool FileManager::Init()
 					Lang = 1;
 			}
 			CurrentFile.close();
-	//	}
 	}
 	else
 	{
@@ -111,16 +108,105 @@ bool FileManager::SaveConfig()
 	return false;
 }
 
+void FileManager::DeleteFavour(int pid)
+{
+
+	for (int i = 0; i < Favourites.size(); i++)
+	{
+		if (Favourites[i].pid == pid)
+		{
+			Favourites[i].pid = -1;
+			
+			break;
+		}
+	}
+
+	typedef vector<int> IntContainer;
+	typedef IntContainer::iterator  IntIterator;
+
+	IntIterator j = find(FavouritesPids.begin(), FavouritesPids.end(), pid);
+	if (j != FavouritesPids.end())
+		FavouritesPids.erase(j);
+
+}
+
+void FileManager::LoadFavourites()
+{
+	stringstream filename;
+	current_dir = _getcwd(NULL, 0);
+	filename << current_dir << "\\" << FAVOURFILE;
+	ifstream config(filename.str());
+	if (config.is_open())
+	{
+		vector<string> Vec;
+		while (!config.eof())
+		{
+			string str;
+			getline(config, str);
+			if (!str.empty())
+				FavouritesPids.push_back( atoi(str.c_str()) );
+		}
+	}
+}
+
+void FileManager::SaveFavourites()
+{
+	stringstream filename;
+	current_dir = _getcwd(NULL, 0);
+	filename << current_dir << "\\" << FAVOURFILE;
+	ofstream ofs(filename.str());
+	for (int i = 0; i < FavouritesPids.size(); i++)
+	{
+		ofs << FavouritesPids[i] << endl;
+	}
+
+	ofs.close();
+}
+
 void FileManager::ClearData()
 {
 	Names.clear();
 	Params.clear();
 	Values.clear();
+	Favourites.clear();
+}
+
+bool FileManager::ListLoad()
+{
+	if (server_path.empty())
+		return false;
+	string m = server_path;
+	if (file.empty())
+		m += "\\proto\\items\\items.lst";
+	m = file;
+	ifstream CurrentFile;
+	CurrentFile.open(m);
+	if (CurrentFile.is_open())
+	{
+		while (!CurrentFile.eof())
+		{	// считывать данные с файла
+
+			string str;
+			getline(CurrentFile, str);
+
+			progress = 0;
+
+			string path = server_path;
+			path += "\\proto\\items\\"+ str;
+			OpenFile(path);
+			
+			progress++;
+		}
+		
+	}
+	CurrentFile.close();
+	Loaded = true;
+	return true;
 }
 
 bool FileManager::OpenFile(string name)
 {
-	ClearData();
+//	ClearData();
 	ifstream CurrentFile;
 	CurrentFile.open(name);
 	if (CurrentFile.is_open())
@@ -133,13 +219,13 @@ bool FileManager::OpenFile(string name)
 
 			getline(CurrentFile, str);
 			vector<string> tmp;
-
+			curent_load = str;
 			if (str.c_str() == "\n")	// переносы строк тоже сохраняем
 			{
 				Names.push_back("\n");
 				Params.push_back("");
 				Values.push_back("");
-
+			
 				continue;
 			}
 
@@ -153,14 +239,17 @@ bool FileManager::OpenFile(string name)
 			}
 			else			// какие то параменры без значений
 			{
+				
 				Names.push_back(str);
 				Params.push_back("");
 				Values.push_back("");
+				progress++;
 			}
 
 			// чистим массив от уже загруженных данных
 			tmp.clear();
 		}
+		
 		CurrentFile.close();	// закрывает
 		return true;
 	}
@@ -223,7 +312,7 @@ void FileManager::SetFileSize(string name)
 	{
 		file_path = name;
 		File.seekg(0, ios::end);
-		long size = File.tellg();
+		long size = (long)File.tellg();
 		File.seekg(0, ios::beg);
 		MaxBarValue = size;
 		File.close();
@@ -354,17 +443,32 @@ int FileManager::GetProtoTypeIndex(Proto p)
 	for (int i = 0; i < p.Params.size(); i++)
 	{
 		if (p.Params[i] == "Type=")
-			return atoi(p.Values[i].c_str());
+			return CLAMP(atoi(p.Values[i].c_str()),0, 14 );
 	}
 	return 0;
 }
+/*
+#define  ITEM_TYPE_TILE   (0)
+#define  ITEM_TYPE_ARMOR   (1)
+#define  ITEM_TYPE_DRUG   (2)
+#define  ITEM_TYPE_WEAPON   (3)
+#define  ITEM_TYPE_AMMO   (4)
+#define  ITEM_TYPE_MISC   (5)
+#define  ITEM_TYPE_MISC2   (6)
+#define  ITEM_TYPE_KEY   (7)
+#define  ITEM_TYPE_CONTAINER   (8)
+#define  ITEM_TYPE_DOOR   (9)
+#define  ITEM_TYPE_GRID   (10)
+#define  ITEM_TYPE_GENERIC   (11)
+#define  ITEM_TYPE_WALL   (12)
 
+*/
 string FileManager::GetStringType(int type)
 {
-	vector<string> types = {"NONE", "ARMOR", "DRUG", "WEAPON", "AMMO", "MISC", "KEY", "CONTAINER" , "DOOR", "GRID", "GENERIC" , "WALL", "CAR"};
+	vector<string> types = {"NONE", "ARMOR", "DRUG", "WEAPON", "AMMO", "MISC", "CAR ", "KEY" , "CONTAINER", "DOOR", "GRID" , "GENERIC", "WALL", "MAX_TYPES"};
 
 	if (type > types.size())
-		type = 13;
+		type = 14;
 	if (type < 0)
 		type = 0;
 	return types[type];

@@ -3,6 +3,7 @@
 using namespace std;
 
 #define INIFILE ("Config.cfg");
+#define FAVOURFILE ("FavouritesProto.ini");
 
 
 
@@ -15,9 +16,12 @@ struct Proto
 	string prot;
 	vector<string> Params;
 	vector<string> Values;
+	int tree_index;
+
 	void Clear()
 	{
 		pid = 0;
+		tree_index = 0;
 		prot.clear();
 		Params.clear();
 		Values.clear();
@@ -25,6 +29,7 @@ struct Proto
 	Proto()
 	{
 		pid = 0;
+		tree_index = 0;
 		prot.clear();
 		Params.clear();
 		Values.clear();
@@ -43,6 +48,12 @@ public:
 
 	string current_dir;
 
+
+
+	string file;
+	string curent_load;
+	bool Loaded;
+
 //////////////////////////////// CONFIG
 	string server_path;
 	// 0 = engl, 1 = russ
@@ -56,9 +67,22 @@ public:
 	int MaxBarValue = 0;
 	int progress = 0;
 
+	
 	// !config file
 
+/////////////////////////////	Favourites
+	vector<Proto> Favourites;
+	vector<int> FavouritesPids;
+
+	void DeleteFavour(int pid);
+
+	void LoadFavourites();
+	void SaveFavourites();
+/////////////////////////////	!Favourites
+
 	void ClearData();
+	bool ListLoad();
+
 	bool OpenFile(string name);
 	bool SaveFile();
 	bool SaveFile(string name);
@@ -109,10 +133,13 @@ public:
 	{
 		Params.clear();
 		Values.clear();
+		FavouritesPids.clear();
+		Loaded = false;
 	}
 	~FileManager()
 	{
 		Params.clear();
 		Values.clear();
+		FavouritesPids.clear();
 	}
 };
